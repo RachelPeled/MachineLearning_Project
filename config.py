@@ -65,9 +65,9 @@ HOUSE_CONFIG = {
 		"dtype": "",
 		"imputation_method": "",
 		"members": {
-			"Grvl": { "ordinal":1, "name":"Gravel"},
-			"Pave": { "ordinal":2, "name":"Paved"},
-			"NoAlley": { "ordinal":2, "name":"No alley access"},
+			"Grvl": { "ordinal":0, "name":"Gravel"},
+			"Pave": { "ordinal":0, "name":"Paved"},
+			"NoAlley": { "ordinal":0, "name":"No alley access"},
 		}
 	},
 	"LotShape": {
@@ -832,13 +832,13 @@ HOUSE_CONFIG = {
 	"MoSold": {
 		"description": "Month Sold (MM)",
 		"dtype": "",
-		"imputation_method": "",
+		"imputation_method": "object",
 		"members": {
 		}
 	},
 	"YrSold": {
 		"description": "Year Sold (YYYY)",
-		"dtype": "",
+		"dtype": "object",
 		"imputation_method": "",
 		"members": {
 		}

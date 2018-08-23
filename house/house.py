@@ -19,7 +19,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import confusion_matrix, roc_auc_score
 from sklearn.model_selection import cross_val_score
 from sklearn.cross_validation import train_test_split
-
+from sklearn.model_selection import train_test_split
 # A class to hold our housing data
 class House():
     def __init__(self, train_data_file, test_data_file):
@@ -27,6 +27,7 @@ class House():
         test = pd.read_csv(test_data_file)
         self.all = pd.concat([train,test], ignore_index=True)
         self.all['test'] = self.all.SalePrice.isnull()
+        self.Id=self.all['Id']
         self.all.drop('Id', axis=1, inplace=True)
 
     def train(self):
@@ -179,7 +180,7 @@ class House():
                 self.all.loc[self.all['GarageYrBlt'].isnull(),'GarageYrBlt'] = self.all['YearBuilt'].loc[missing_grage_yr]
 
             elif column in mode:
-                self.all[column] = [self.all[column].mode() if pd.isnull(x) else x for x in self.all[column]]
+                self.all[column] = [self.all[column].mode()[0] if pd.isnull(x) else x for x in self.all[column]]
             elif column in mean:
                 self.all[column].fillna(self.all[column].mean(),inplace=True)
             elif column in NoneOrZero:
@@ -192,37 +193,54 @@ class House():
                 print( 'Uh oh!!! No cleaning strategy for:' + column )
 
 
-    def convert_types(self, columns_to_convert):
-        for column, type in columns_to_convert:
-            print("assigning " + column + " as type " + type)
-            self.all[column] = self.all[column].astype(type)
 
 
 
-    def engineer_features(self):
-        # General Dummification
-        categorical_columns = [x for x in self.train().columns if self.train()[x].dtype == 'object' ]
-        non_categorical_columns = [x for x in self.train().columns if self.train()[x].dtype != 'object' ]
-        ordinal_columns=['LotShape', 'Condition1', 'Condition2', 'OverallQual', 'OverallCond']
-
-        dummy_columns = [ x for x in categorical_columns if x not in ordinal_columns]
-        use_columns = dummy_columns + non_categorical_columns
-
-        self.dummy_train = pd.get_dummies(self.train()[use_columns], drop_first=True, dummy_na=True)
 
         # TBD: do something with ordinals!!!!!
     def sg_ordinals(self):
         # general ordinal columns
-        self.ord_df=self.train().copy()
         ord_cols = ['ExterQual', 'ExterCond','BsmtCond','HeatingQC', 'KitchenQual',
-                   'FireplaceQu', 'GarageQual', 'GarageCond', 'PoolQC']
+                   'FireplaceQu']
         ord_dic = {'Ex': 5, 'Gd': 4, 'TA': 3, 'Fa':2, 'Po':1}
         for col in ord_cols:
-            self.ord_df[col] = self.ord_df[col].map(lambda x: ord_dic.get(x, 0))
+            self.train()[col] = self.train()[col].apply(lambda x: ord_dic.get(x, 0))
+
+        #Different Ordinal columns
+        GarageQual_dic = {'Ex': 1, 'Gd': 2, 'TA': 3,'Fa': 4, 'Po': 5,'None':6}
         functional_dic = {'Typ':8, 'Min1':7,'Min2': 6,'Mod':5, 'Maj1':4,'Maj2':3,'Sev':2,'Sal':1}
-        self.ord_df['Functional'] = self.ord_df['Functional'].map(lambda x: functional_dic.get(x, 0))
-        GarageFinish = {'Fin': 1, 'RFn': 2, 'Unf': 3, 'None':4}
-        self.ord_df['GarageFinish'] = self.ord_df['GarageFinish'].map(lambda x: GarageFinish.get(x, 0))
+        GarageFinish_dic = {'Fin': 1, 'RFn': 2, 'Unf': 3, 'None':4}
+        GarageCond_dic = {'Ex': 1, 'Gd': 2, 'TA': 3,'Fa': 4, 'Po': 5,'None':6}
+        PoolQC_dic = {'Ex': 1, 'Gd': 2, 'TA': 3,'Fa': 4, 'Na': 5, 'None':5}
+
+        self.train()['GarageFinish'] = self.train()['GarageFinish'].apply(lambda x: GarageFinish_dic.get(x, 0))
+        self.train()['Functional'] = self.train()['Functional'].apply(lambda x: functional_dic.get(x, 0))
+        self.train()['GarageQual'] = self.train()['GarageQual'].apply(lambda x: GarageQual_dic.get(x, 0))
+        self.train()['GarageCond'] = self.train()['GarageCond'].apply(lambda x: GarageCond_dic.get(x, 0))
+        self.train()['PoolQC'] = self.train()['PoolQC'].apply(lambda x: PoolQC_dic.get(x, 0))
+
+    def engineer_features(self, house_config):
+        # General Dummification
+        categorical_columns = [x for x in self.all.columns if self.all[x].dtype == 'object' ]
+        non_categorical_columns = [x for x in self.all.columns if self.all[x].dtype != 'object' ]
+
+        # TBD: do something with ordinals!!!!!
+        for column in categorical_columns:
+            for member_name, member_dict in house_config[column]['members'].items():
+                if member_dict['ordinal'] != 0:
+                    print( "Replacing " + member_name + " with " + str(member_dict['ordinal']) + " in column " + column)
+                    self.all[column].replace(member_name, member_dict['ordinal'], inplace=True)
+
+            #print( "Column " + column + " now has these unique values " + ' '.join(self.all[column].unique()))
+
+        use_columns = non_categorical_columns + categorical_columns
+        self.dummy_train = pd.get_dummies(self.all[use_columns], drop_first=True, dummy_na=True)
+
+    def convert_types(self, house_config):
+        for house_variable_name, house_variable_value in house_config.items():
+            if len(house_variable_value['dtype']) != 0:
+                print("assigning " + house_variable_name + " as type " + house_variable_value['dtype'])
+                self.all[house_variable_name] = self.all[house_variable_name].astype(house_variable_value['dtype'])
 
     def label_encode_engineer(self):
         # must be called AFTER sg_ordinals
@@ -255,6 +273,14 @@ class House():
         except:
             print('DOING SPLITS!!!!')
             self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(x,y)
+
+    def test_tr_split(self):
+        train=self.dummy_train[self.dummy_train['test']==False].drop('test',axis=1)
+        test=self.dummy_train[self.dummy_train['test']==True].drop('test',axis=1)
+        y_train= train['SalePrice']
+        x_train=train.drop('SalePrice',axis=1)
+        X_train, X_test, Y_train, Y_test = train_test_split( self.x_train, self.y_train)
+
 
     def sg_test_train_split(self,data_type):
         if data_type=="label_df":
