@@ -10,11 +10,8 @@ del house
 house = House('data/train.csv','data/test.csv')
 # %%
 
-<<<<<<< Updated upstream
-=======
-house.testmethod()
->>>>>>> upstream/master
 
+house.cleanRP()
 ##EDA:
 #All variables:
 house.all.shape
@@ -32,7 +29,8 @@ house.corr_matrix(house.train(), 'SalePrice')
 
 #Missing values:
 house.missing_stats()
-house.clean()
+house.cleanRP()
+house.all['Exterior1st'].dtypes
 
 house.sg_ordinals()
 house.label_encode_engineer()
@@ -44,7 +42,7 @@ columns_to_convert = [  ('MSSubClass', 'object'), ('LotArea', 'float64' ), ('Ove
                         ('WoodDeckSF', 'float64'), ('ScreenPorch', 'float64'), ('OpenPorchSF', 'float64'),
                         ('MiscVal', 'float64'), ('LowQualFinSF', 'float64'), ('GrLivArea', 'float64'), ]
 
-house.convert_types(columns_to_convert)
+house.convert_types(HOUSE_CONFIG)
 
 
 
@@ -65,3 +63,5 @@ house.engineer_features(HOUSE_CONFIG)
 
 
 house.sk_random_forest(1000)
+import matplotlib.pyplot as plt
+plt.scatter(house.all['LotFrontage'],house.all['SalePrice'])

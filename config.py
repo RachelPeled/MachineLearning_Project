@@ -832,13 +832,13 @@ HOUSE_CONFIG = {
 	"MoSold": {
 		"description": "Month Sold (MM)",
 		"dtype": "",
-		"imputation_method": "object",
+		"imputation_method": "",
 		"members": {
 		}
 	},
 	"YrSold": {
 		"description": "Year Sold (YYYY)",
-		"dtype": "object",
+		"dtype": "",
 		"imputation_method": "",
 		"members": {
 		}

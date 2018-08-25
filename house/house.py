@@ -13,13 +13,14 @@ import statsmodels.api as sm
 from  statsmodels.genmod import generalized_linear_model
 
 import missingno as msno
-
+from sklearn import linear_model
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import confusion_matrix, roc_auc_score
 from sklearn.model_selection import cross_val_score
 from sklearn.cross_validation import train_test_split
 from sklearn.model_selection import train_test_split
+from scipy.special import boxcox1p
 # A class to hold our housing data
 class House():
     def __init__(self, train_data_file, test_data_file):
@@ -176,8 +177,11 @@ class House():
                 self.all.loc[self.all['LotFrontage'].isnull(),'LotFrontage'] = y1.loc[index]
             #imputing the value of YearBuiltto the GarageYrBlt.
             elif  column=='GarageYrBlt':
-                missing_grage_yr=self.all[self.all['GarageYrBlt'].isnull()].index
-                self.all.loc[self.all['GarageYrBlt'].isnull(),'GarageYrBlt'] = self.all['YearBuilt'].loc[missing_grage_yr]
+                missing_index=self.all[self.all['GarageYrBlt'].isnull()].index
+                for i in missing_index:
+                    self.all.loc[i,'GarageYrBlt']=1871
+                #missing_garage_yr=self.all[self.all['GarageYrBlt'].isnull()].index
+                #self.all.loc[self.all['GarageYrBlt'].isnull(),'GarageYrBlt'] = self.all['YearBuilt'].loc[missing_garage_yr]
 
             elif column in mode:
                 self.all[column] = [self.all[column].mode()[0] if pd.isnull(x) else x for x in self.all[column]]
@@ -355,3 +359,65 @@ class House():
         model = sm.OLS(self.y_train,self.x_train)
         results = model.fit()
         print(results.summary())
+
+    def sm_boxcox(self,mut=1):
+        skewness = self.train().select_dtypes(exclude = ["object"]).apply(lambda x: skew(x))
+        skewness = skewness[abs(skewness) > 0.5]
+        print(str(skewness.shape[0]) + " skewed numerical features to box cox transform")
+        skewed_features = skewness.index
+        lam = 0.15
+        #for feat in skewed_features:
+            #all_data[feat] += 1
+            #self.train()[skewed_features] = boxcox1p(self.train()[skewed_features], lam)
+
+        if mut==1:
+            self.train()[skewed_features] = boxcox1p(self.train()[skewed_features], lam)
+            self.skewed_features=skewness.index
+        print(skewed_features)
+
+    def cleanRP_SG(self):
+        from math import exp
+        NoneOrZero=['BsmtQual','BsmtCond','BsmtExposure','BsmtFinType1',
+                'BsmtFinType2','BsmtFinSF1','BsmtFinSF2','Alley',
+               'Fence','GarageType','GarageQual',
+               'GarageCond','GarageFinish','GarageCars',
+                'GarageArea','MasVnrArea','MasVnrType','MiscFeature','PoolQC',
+                'BsmtFullBath', 'BsmtHalfBath', 'BsmtUnfSF']
+        mode=['Electrical','Exterior1st','Exterior2nd','FireplaceQu','Functional','KitchenQual','MSZoning','SaleType','Utilities']
+        mean=['TotalBsmtSF']
+        columns_with_missing_data=[name for name in self.all.columns if np.sum(self.all[name].isnull()) !=0]
+        columns_with_missing_data.remove('SalePrice')
+        for column in columns_with_missing_data:
+            col_data = self.all[column]
+            #print( 'Cleaning ' + str(np.sum(col_data.isnull())) + ' data entries for column: ' + column )
+        #log transformation for missing LotFrontage
+            if  column=='LotFrontage':
+                ols=linear_model.LinearRegression()
+                my_ind=self.all[self.all['LotFrontage'].isnull()].index
+
+                y_train=self.all['LotFrontage'].loc[self.all['LotFrontage'].isnull()==False].values
+                x_train=self.all['LotArea'].loc[self.all['LotFrontage'].isnull()==False].values
+                x_train=np.log(x_train)
+                ols.fit(x_train.reshape(-1,1), y_train)   #### What happen if we remove the 'reshape' method?
+                for i in my_ind:
+                    print(np.log(self.all['LotArea'].loc[i])*ols.coef_)
+                    self.all.loc[i,'LotFrontage']=((np.log(self.all.loc[i,'LotArea'])*ols.coef_)+ols.intercept_)[0]
+
+            #imputing the value of YearBuiltto the GarageYrBlt.
+            elif  column=='GarageYrBlt':
+                missing_index=self.all[self.all['GarageYrBlt'].isnull()].index
+                for i in missing_index:
+                    self.all.loc[i,'GarageYrBlt']=1871
+            elif column in mode:
+                # in case of function messing up - remove [0]
+                self.all[column] = [self.all[column].mode()[0] if pd.isnull(x) else x for x in self.all[column]]
+            elif column in mean:
+                self.all[column].fillna(self.all[column].mean(),inplace=True)
+            elif column in NoneOrZero:
+                if col_data.dtype == 'object':
+                    no_string = 'None'
+                    self.all[column] = [ no_string if pd.isnull(x) else x for x in self.all[column]]
+                else:
+                    self.all[column] = [ 0 if pd.isnull(x) else x for x in self.all[column]]
+            else:
+                print( 'Uh oh!!! No cleaning strategy for:' + column )
